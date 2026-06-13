@@ -1,0 +1,6 @@
+@OrderOrchestration.Api.Bff_HostAddress = http://localhost:5193
+
+GET {{OrderOrchestration.Api.Bff_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
