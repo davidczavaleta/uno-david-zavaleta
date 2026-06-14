@@ -4,8 +4,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddGrpc();
+builder.Services.AddGrpcHealthChecks();
+builder.Services.AddGrpcReflection();
 
 var app = builder.Build();
+
+IHostEnvironment environment = app.Environment;
+if (environment.IsDevelopment())
+{
+    app.MapGrpcReflectionService();
+}
+
+app.MapGrpcHealthChecksService();
 
 // Configure the HTTP request pipeline.
 app.MapGrpcService<GreeterService>();

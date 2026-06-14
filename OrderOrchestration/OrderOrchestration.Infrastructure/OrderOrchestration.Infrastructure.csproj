@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\OrderOrchestration.Application\OrderOrchestration.Application.csproj" />
+    <ProjectReference Include="..\OrderOrchestration.Domain\OrderOrchestration.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
