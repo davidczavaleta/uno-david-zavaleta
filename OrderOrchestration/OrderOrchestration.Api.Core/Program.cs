@@ -1,4 +1,5 @@
 using OrderOrchestration.Api.Core.Services;
+using OrderOrchestration.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,6 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 builder.Services.AddGrpcHealthChecks();
 builder.Services.AddGrpcReflection();
+
+//Agrega los servicios personalizados de infraestructura
+builder.Services.AddInfrastructureServices(builder.Configuration);
+
 var app = builder.Build();
 
 IWebHostEnvironment env = app.Environment;
