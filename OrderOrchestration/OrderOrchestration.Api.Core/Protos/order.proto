@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option csharp_namespace = "OrderOrchestration.Api.Core";
+
+package order;
+
+service OrderService {
+  // Envia una nueva orden para su procesamiento (unary).
+  rpc SubmitOrder (SubmitOrderRequest) returns (SubmitOrderReply);
+
+  // Transmite en tiempo real los cambios de estado de una orden (server streaming).
+  rpc TrackOrderStatus (TrackOrderRequest) returns (stream OrderStatusReply);
+}
+
+message OrderItemMessage {
+  string product_id = 1;
+  int32 quantity = 2;
+  double unit_price = 3;
+}
+
+message SubmitOrderRequest {
+  // Opcional. Si viene vacio el servidor genera uno nuevo.
+  string order_id = 1;
+  string user_id = 2;
+  repeated OrderItemMessage items = 3;
+  double total_amount = 4;
+  // Token de idempotencia: reintentos con el mismo token no duplican el procesamiento.
+  string payment_token = 5;
+}
+
+message SubmitOrderReply {
+  string order_id = 1;
+  string status = 2;
+}
+
+message TrackOrderRequest {
+  string order_id = 1;
+}
+
+message OrderStatusReply {
+  string order_id = 1;
+  string status = 2;
+  // Marca de tiempo UTC en formato ISO 8601.
+  string timestamp = 3;
+}

@@ -6,8 +6,10 @@ using OrderOrchestration.Application.Contracts;
 using OrderOrchestration.Domain.Data;
 using OrderOrchestration.Infrastructure.GrpcClients;
 using OrderOrchestration.Infrastructure.Mongo;
+using OrderOrchestration.Infrastructure.Outbox;
 using OrderOrchestration.Infrastructure.Postgres;
 using OrderOrchestration.Infrastructure.Resilience;
+using OrderOrchestration.Infrastructure.Streaming;
 
 namespace OrderOrchestration.Infrastructure
 {
@@ -54,6 +56,12 @@ namespace OrderOrchestration.Infrastructure
 
             // 7. Registrar la implementación del cliente de fraude
             services.AddScoped<IFraudCheckService, FraudCheckGrpcClient>();
+
+            // 8. Notificador de estado en tiempo real (singleton para compartir suscripciones)
+            services.AddSingleton<IOrderStatusNotifier, InMemoryOrderStatusNotifier>();
+
+            // 9. Worker del patrón Outbox que publica los eventos de dominio de forma confiable
+            services.AddHostedService<OutboxDispatcher>();
 
             return services;
         }

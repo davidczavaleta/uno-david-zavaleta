@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
+using Polly.Timeout;
 
 namespace OrderOrchestration.Infrastructure.Resilience;
 
@@ -16,13 +17,17 @@ public static class ResiliencePolicies
     {
         services.AddResiliencePipeline(GrpcFraudPipeline, builder =>
         {
-            // 1. Retry: 3 reintentos con espera exponencial
+            // 1. Retry (estrategia más externa): 3 reintentos con espera exponencial.
+            //    Maneja tanto fallos gRPC como los timeouts por intento (TimeoutRejectedException),
+            //    de modo que una respuesta lenta del servicio de fraude provoque un reintento.
             builder.AddRetry(new RetryStrategyOptions
             {
                 MaxRetryAttempts = 3,
                 Delay = TimeSpan.FromMilliseconds(200),
                 BackoffType = DelayBackoffType.Exponential,
-                ShouldHandle = new PredicateBuilder().Handle<Grpc.Core.RpcException>()
+                ShouldHandle = new PredicateBuilder()
+                    .Handle<Grpc.Core.RpcException>()
+                    .Handle<TimeoutRejectedException>()
             });
 
             // 2. Circuit Breaker: se abre si falla el 50% de las últimas 10 peticiones
@@ -32,10 +37,12 @@ public static class ResiliencePolicies
                 SamplingDuration = TimeSpan.FromSeconds(30),
                 MinimumThroughput = 10,
                 BreakDuration = TimeSpan.FromSeconds(15),
-                ShouldHandle = new PredicateBuilder().Handle<Grpc.Core.RpcException>()
+                ShouldHandle = new PredicateBuilder()
+                    .Handle<Grpc.Core.RpcException>()
+                    .Handle<TimeoutRejectedException>()
             });
 
-            // 3. Timeout: máximo 1 segundo por intento
+            // 3. Timeout (estrategia más interna): máximo 1 segundo por intento.
             builder.AddTimeout(TimeSpan.FromSeconds(1));
         });
 

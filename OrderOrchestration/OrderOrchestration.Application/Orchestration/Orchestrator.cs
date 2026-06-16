@@ -20,14 +20,30 @@ namespace OrderOrchestration.Application.Orchestration
     {
         private readonly IOrderRepository _orderRepository;
         private readonly IFraudCheckService _fraudCheckService;
+        private readonly IOrderStatusNotifier _statusNotifier;
 
         /// <summary>
         /// Inicializa el orquestador con el repositorio de órdenes requerido para leer y persistir el estado.
         /// </summary>
-        public Orchestrator(IOrderRepository orderRepository, IFraudCheckService fraudCheckService)
+        public Orchestrator(
+            IOrderRepository orderRepository,
+            IFraudCheckService fraudCheckService,
+            IOrderStatusNotifier statusNotifier)
         {
             _orderRepository = orderRepository;
             _fraudCheckService = fraudCheckService;
+            _statusNotifier = statusNotifier;
+        }
+
+        /// <summary>
+        /// Persiste la orden y notifica el cambio de estado a los suscriptores del stream de seguimiento.
+        /// </summary>
+        private async Task SaveAndNotifyAsync(Order order, CancellationToken cancellationToken)
+        {
+            await _orderRepository.SaveAsync(order);
+            await _statusNotifier.PublishAsync(
+                new OrderStatusUpdate(order.OrderId.ToString(), order.Status.ToString(), order.UpdatedAt),
+                cancellationToken);
         }
 
         /// <summary>
@@ -54,7 +70,7 @@ namespace OrderOrchestration.Application.Orchestration
                 result.IsApproved,
                 result.Reason));
 
-            await _orderRepository.SaveAsync(order);
+            await SaveAndNotifyAsync(order, cancellationToken);
         }
 
         /// <summary>
@@ -79,7 +95,7 @@ namespace OrderOrchestration.Application.Orchestration
                 order.AddDomainEvent(new OrderRejectedEvent(order.OrderId.ToString(), notification.Reason ?? string.Empty));
             }
 
-            await _orderRepository.SaveAsync(order);
+            await SaveAndNotifyAsync(order, cancellationToken);
         }
 
         /// <summary>
@@ -96,7 +112,7 @@ namespace OrderOrchestration.Application.Orchestration
             order.Status = OrderStatus.PaymentProcessed;
             order.AddDomainEvent(new PaymentProcessedEvent(order.OrderId.ToString(), order.PaymentToken));
 
-            await _orderRepository.SaveAsync(order);
+            await SaveAndNotifyAsync(order, cancellationToken);
         }
 
         /// <summary>
@@ -113,7 +129,7 @@ namespace OrderOrchestration.Application.Orchestration
             order.Status = OrderStatus.ShipmentRequested;
             order.AddDomainEvent(new ShipmentRequestedEvent(order.OrderId.ToString()));
 
-            await _orderRepository.SaveAsync(order);
+            await SaveAndNotifyAsync(order, cancellationToken);
         }
 
         /// <summary>

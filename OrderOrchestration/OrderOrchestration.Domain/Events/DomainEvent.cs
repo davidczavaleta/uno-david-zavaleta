@@ -8,7 +8,7 @@ namespace OrderOrchestration.Domain.Events
     /// </summary>
     public abstract class DomainEvent : INotification
     {
-        public Guid EventId { get; set; }
+        public Guid EventId { get; set; } = Guid.NewGuid();
         public DateTime OccurredOn { get; } = DateTime.UtcNow;
     }
 }

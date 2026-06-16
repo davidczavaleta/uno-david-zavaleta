@@ -49,7 +49,7 @@ namespace OrderOrchestration.Application.Commands
             };
 
             var orderSubmittedEvent = new OrderSubmittedEvent(
-                order.OrderId,
+                order.OrderId.ToString(),
                 order.UserId,
                 order.TotalAmount,
                 order.Items,

@@ -17,6 +17,23 @@ namespace OrderOrchestration.Infrastructure.Mongo
             var database = mongoClient.GetDatabase(mongoDbSettings.Value.DatabaseName);
 
             _ordersCollection = database.GetCollection<Order>("Orders");
+
+            EnsureIndexes();
+        }
+
+        /// <summary>
+        /// Garantiza un índice único sobre <c>PaymentToken</c>. Actúa como red de seguridad
+        /// de idempotencia: si dos peticiones concurrentes con el mismo token intentaran crear
+        /// órdenes distintas, MongoDB rechazará la segunda inserción.
+        /// </summary>
+        private void EnsureIndexes()
+        {
+            var indexKeys = Builders<Order>.IndexKeys.Ascending(o => o.PaymentToken);
+            var indexModel = new CreateIndexModel<Order>(
+                indexKeys,
+                new CreateIndexOptions { Unique = true, Name = "ux_orders_payment_token" });
+
+            _ordersCollection.Indexes.CreateOne(indexModel);
         }
 
         /// <inheritdoc />
@@ -48,6 +65,20 @@ namespace OrderOrchestration.Infrastructure.Mongo
             var options = new ReplaceOptions { IsUpsert = true };
 
             await _ordersCollection.ReplaceOneAsync(filter, order, options);
+        }
+
+        /// <inheritdoc />
+        public async Task MarkOutboxMessageProcessedAsync(Guid orderId, Guid messageId)
+        {
+            var filter = Builders<Order>.Filter.And(
+                Builders<Order>.Filter.Eq(o => o.OrderId, orderId),
+                Builders<Order>.Filter.ElemMatch(o => o.OutboxMessages, m => m.Id == messageId));
+
+            var update = Builders<Order>.Update
+                .Set("OutboxMessages.$.Processed", true)
+                .Set("OutboxMessages.$.ProcessedOn", DateTime.UtcNow);
+
+            await _ordersCollection.UpdateOneAsync(filter, update);
         }
     }
 }

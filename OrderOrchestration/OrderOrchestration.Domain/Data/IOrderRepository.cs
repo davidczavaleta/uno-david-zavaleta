@@ -28,5 +28,14 @@ namespace OrderOrchestration.Domain.Data
         /// </summary>
         /// <returns></returns>
         Task<List<Order>> GetOrdersWithUnprocessedEventsAsync();
+
+        /// <summary>
+        /// Marca un mensaje específico del outbox como procesado mediante una actualización
+        /// atómica posicional, sin sobrescribir el resto del documento (evita pérdida de cambios
+        /// de estado realizados concurrentemente por el orquestador).
+        /// </summary>
+        /// <param name="orderId">Id de la orden propietaria del mensaje.</param>
+        /// <param name="messageId">Id del mensaje del outbox a marcar como procesado.</param>
+        Task MarkOutboxMessageProcessedAsync(Guid orderId, Guid messageId);
     }
 }
