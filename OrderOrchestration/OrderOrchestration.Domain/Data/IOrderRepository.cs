@@ -1,4 +1,4 @@
-﻿namespace OrderOrchestration.Domain.Data
+namespace OrderOrchestration.Domain.Data
 {
     public interface IOrderRepository
     {

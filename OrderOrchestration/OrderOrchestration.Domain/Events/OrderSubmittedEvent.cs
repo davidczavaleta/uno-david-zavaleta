@@ -6,13 +6,13 @@
     /// </summary>
     public class OrderSubmittedEvent : DomainEvent
     {
-        public Guid OrderId { get; }
+        public string OrderId { get; }
         public string UserId { get; }
         public decimal TotalAmount { get; }
         public List<OrderItem> Items { get; }
         public string PaymentToken { get; }
-        
-        public OrderSubmittedEvent(Guid orderId, string userId, decimal totalAmount, List<OrderItem> items, string paymentToken)
+
+        public OrderSubmittedEvent(string orderId, string userId, decimal totalAmount, List<OrderItem> items, string paymentToken)
         {
             OrderId = orderId;
             UserId = userId;

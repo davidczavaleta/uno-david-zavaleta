@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using OrderOrchestration.Domain;
 using OrderOrchestration.Domain.Data;
@@ -15,20 +15,21 @@ namespace OrderOrchestration.Infrastructure.Mongo
         public OrderRepository(IOptions<MongoDbSettings> mongoDbSettings, IMongoClient mongoClient)
         {
             var database = mongoClient.GetDatabase(mongoDbSettings.Value.DatabaseName);
-            
+
             _ordersCollection = database.GetCollection<Order>("Orders");
         }
 
         /// <inheritdoc />
         public async Task<Order?> GetByIdAsync(string orderId)
         {
-            return await _ordersCollection.Find(o => o.OrderId.ToString() == orderId).FirstOrDefaultAsync();
+            if (!Guid.TryParse(orderId, out var idGuid)) return null;
+            return await _ordersCollection.Find(o => o.OrderId == idGuid).FirstOrDefaultAsync();
         }
 
         /// <inheritdoc />
         public async Task<Order?> GetByPaymentTokenAsync(string paymentToken)
-        {   
-            return await _ordersCollection.Find(o => o.PaymentToken.ToString() == paymentToken).FirstOrDefaultAsync();
+        {
+            return await _ordersCollection.Find(o => o.PaymentToken == paymentToken).FirstOrDefaultAsync();
         }
 
         /// <inheritdoc />
@@ -47,6 +48,6 @@ namespace OrderOrchestration.Infrastructure.Mongo
             var options = new ReplaceOptions { IsUpsert = true };
 
             await _ordersCollection.ReplaceOneAsync(filter, order, options);
-        }        
+        }
     }
 }
