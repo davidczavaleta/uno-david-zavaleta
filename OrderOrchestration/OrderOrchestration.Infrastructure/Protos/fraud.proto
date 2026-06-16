@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option csharp_namespace = "OrderOrchestration.Infrastructure";
+
+package fraud;
+
+service FraudService {
+  rpc CheckFraud (FraudCheckRequest) returns (FraudCheckResponse);
+}
+
+message FraudCheckRequest {
+  string order_id = 1;
+  string user_id = 2;
+  double total_amount = 3;
+}
+
+message FraudCheckResponse {
+  bool is_approved = 1;
+  string reason = 2;
+}

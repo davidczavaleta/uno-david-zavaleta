@@ -1,4 +1,5 @@
 using MediatR;
+using OrderOrchestration.Application.Contracts;
 using OrderOrchestration.Domain;
 using OrderOrchestration.Domain.Data;
 using OrderOrchestration.Domain.Events;
@@ -18,13 +19,15 @@ namespace OrderOrchestration.Application.Orchestration
     INotificationHandler<ShipmentRequestedEvent>
     {
         private readonly IOrderRepository _orderRepository;
+        private readonly IFraudCheckService _fraudCheckService;
 
         /// <summary>
         /// Inicializa el orquestador con el repositorio de órdenes requerido para leer y persistir el estado.
         /// </summary>
-        public Orchestrator(IOrderRepository orderRepository)
+        public Orchestrator(IOrderRepository orderRepository, IFraudCheckService fraudCheckService)
         {
             _orderRepository = orderRepository;
+            _fraudCheckService = fraudCheckService;
         }
 
         /// <summary>
@@ -40,7 +43,16 @@ namespace OrderOrchestration.Application.Orchestration
 
             order.Status = OrderStatus.FraudCheckPending;
 
-            // TODO en Fase 5: Llamar al microservicio gRPC de fraude real
+            var result = await _fraudCheckService.CheckFraudAsync(
+                            order.OrderId.ToString(),
+                            order.UserId,
+                            order.TotalAmount,
+                            cancellationToken);
+
+            order.AddDomainEvent(new FraudCheckedEvent(
+                order.OrderId.ToString(),
+                result.IsApproved,
+                result.Reason));
 
             await _orderRepository.SaveAsync(order);
         }

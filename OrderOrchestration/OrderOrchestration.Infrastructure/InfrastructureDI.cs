@@ -2,9 +2,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
+using OrderOrchestration.Application.Contracts;
 using OrderOrchestration.Domain.Data;
+using OrderOrchestration.Infrastructure.GrpcClients;
 using OrderOrchestration.Infrastructure.Mongo;
 using OrderOrchestration.Infrastructure.Postgres;
+using OrderOrchestration.Infrastructure.Resilience;
 
 namespace OrderOrchestration.Infrastructure
 {
@@ -27,17 +30,30 @@ namespace OrderOrchestration.Infrastructure
             services.Configure<MongoDbSettings>(configuration.GetSection("MongoDbSettings"));
 
             //2. Mongo client 
-            services.AddSingleton<IMongoClient>(sp => {
+            services.AddSingleton<IMongoClient>(sp =>
+            {
                 var settings = configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
                 return new MongoClient(settings.ConnectionString);
             });
 
             //3. Postgres db context
             services.AddDbContext<AuditDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("AuditPostgres")));
-                        
+
             //4. Repositorios
             services.AddScoped<IOrderRepository, OrderRepository>();
-            services.AddScoped<IAuditRepository, AuditRepository>(); 
+            services.AddScoped<IAuditRepository, AuditRepository>();
+
+            // 5. Pipeline de resiliencia de Polly (reutilizable)
+            services.AddGrpcResiliencePipeline();
+
+            // 6. Cliente gRPC tipado con la URL del servicio de fraude
+            services.AddGrpcClient<FraudService.FraudServiceClient>(options =>
+            {
+                options.Address = new Uri(configuration["FraudService:Url"] ?? "https://localhost:5002");
+            });
+
+            // 7. Registrar la implementación del cliente de fraude
+            services.AddScoped<IFraudCheckService, FraudCheckGrpcClient>();
 
             return services;
         }
