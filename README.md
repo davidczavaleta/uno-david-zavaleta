@@ -223,21 +223,26 @@ npm start   # http://localhost:4200
 
 ### Kubernetes
 
-Construye las imágenes y aplícalas en minikube/kind:
+Construye las imágenes y aplícalas en kind:
 
 ```bash
-# Construir imágenes (ejemplo con el daemon de minikube)
-eval $(minikube docker-env)
+# Construir imágenes con los nombres que esperan los manifiestos
 docker build -t oo-fraud:latest    -f OrderOrchestration/OrderOrchestration.Api.Fraud/Dockerfile OrderOrchestration
 docker build -t oo-core:latest     -f OrderOrchestration/OrderOrchestration.Api.Core/Dockerfile  OrderOrchestration
 docker build -t oo-bff:latest      -f OrderOrchestration/OrderOrchestration.Api.Bff/Dockerfile   OrderOrchestration
 docker build -t oo-frontend:latest -f frontend/Dockerfile frontend
 
-# Desplegar
+# Cargar las imágenes a kind
+kind load docker-image oo-fraud:latest
+kind load docker-image oo-core:latest
+kind load docker-image oo-bff:latest
+kind load docker-image oo-frontend:latest
+
+# Desplegar usando Kustomize
 kubectl apply -k k8s/
 
-# Acceso al frontend (NodePort)
-minikube service frontend -n order-orchestration
+# Acceso al frontend (Port-forward en el namespace)
+kubectl port-forward svc/frontend -n order-orchestration 4200:80
 ```
 
 Los manifiestos incluyen `ConfigMap`, `Secret`, probes (gRPC para Core/Fraud, TCP/HTTP para BFF/Frontend), límites de recursos y un init container que espera a Postgres/Mongo antes de arrancar el Core (las migraciones de EF se aplican al iniciar).

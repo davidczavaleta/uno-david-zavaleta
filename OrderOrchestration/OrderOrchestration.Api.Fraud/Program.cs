@@ -1,11 +1,13 @@
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OrderOrchestration.Api.Fraud.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddGrpc();
+builder.Services.AddHealthChecks().AddCheck("self", () => HealthCheckResult.Healthy());
 builder.Services.AddGrpcHealthChecks();
 builder.Services.AddGrpcReflection();
 
