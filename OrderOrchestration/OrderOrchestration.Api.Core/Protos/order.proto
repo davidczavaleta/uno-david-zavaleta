@@ -10,6 +10,12 @@ service OrderService {
 
   // Transmite en tiempo real los cambios de estado de una orden (server streaming).
   rpc TrackOrderStatus (TrackOrderRequest) returns (stream OrderStatusReply);
+
+  // Resuelve manualmente (human-in-the-loop) una orden en revision (unary).
+  rpc ResolveManualReview (ResolveManualReviewRequest) returns (ResolveManualReviewReply);
+
+  // Lista las ordenes pendientes de revision manual (unary).
+  rpc GetPendingReviews (GetPendingReviewsRequest) returns (GetPendingReviewsReply);
 }
 
 message OrderItemMessage {
@@ -42,4 +48,30 @@ message OrderStatusReply {
   string status = 2;
   // Marca de tiempo UTC en formato ISO 8601.
   string timestamp = 3;
+}
+
+message ResolveManualReviewRequest {
+  string order_id = 1;
+  bool approved = 2;
+  string reviewer = 3;
+}
+
+message ResolveManualReviewReply {
+  string order_id = 1;
+  string status = 2;
+}
+
+message GetPendingReviewsRequest {
+}
+
+message PendingReview {
+  string order_id = 1;
+  string user_id = 2;
+  double total_amount = 3;
+  // Marca de tiempo UTC en formato ISO 8601.
+  string created_at = 4;
+}
+
+message GetPendingReviewsReply {
+  repeated PendingReview reviews = 1;
 }

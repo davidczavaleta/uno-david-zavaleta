@@ -1,0 +1,15 @@
+# Dependencias
+/node_modules
+
+# Builds
+/dist
+/out-tsc
+/.angular
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/*
+.idea

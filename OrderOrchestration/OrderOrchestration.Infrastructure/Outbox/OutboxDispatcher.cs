@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,13 @@ namespace OrderOrchestration.Infrastructure.Outbox;
 /// </summary>
 public class OutboxDispatcher : BackgroundService
 {
+    /// <summary>
+    /// Fuente de trazas (OpenTelemetry) del worker de outbox. Registrar con
+    /// <c>AddSource(OutboxDispatcher.ActivitySourceName)</c>.
+    /// </summary>
+    public const string ActivitySourceName = "OrderOrchestration.Outbox";
+    private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
+
     private static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -94,6 +102,10 @@ public class OutboxDispatcher : BackgroundService
                     await orderRepository.MarkOutboxMessageProcessedAsync(order.OrderId, message.Id);
                     continue;
                 }
+
+                using var activity = ActivitySource.StartActivity("Outbox.PublishEvent");
+                activity?.SetTag("order.id", order.OrderId.ToString());
+                activity?.SetTag("event.type", domainEvent.GetType().Name);
 
                 await publisher.Publish(domainEvent, cancellationToken);
                 await orderRepository.MarkOutboxMessageProcessedAsync(order.OrderId, message.Id);

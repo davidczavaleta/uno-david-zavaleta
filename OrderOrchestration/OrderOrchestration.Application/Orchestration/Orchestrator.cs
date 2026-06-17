@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MediatR;
 using OrderOrchestration.Application.Contracts;
 using OrderOrchestration.Domain;
@@ -13,11 +14,19 @@ namespace OrderOrchestration.Application.Orchestration
     public class Orchestrator :
     INotificationHandler<OrderSubmittedEvent>,
     INotificationHandler<FraudCheckedEvent>,
+    INotificationHandler<ManualReviewResolvedEvent>,
     INotificationHandler<OrderApprovedEvent>,
     INotificationHandler<OrderRejectedEvent>,
     INotificationHandler<PaymentProcessedEvent>,
     INotificationHandler<ShipmentRequestedEvent>
     {
+        /// <summary>
+        /// Fuente de trazas (OpenTelemetry) del orquestador. Debe registrarse en el pipeline de
+        /// tracing con <c>AddSource(Orchestrator.ActivitySourceName)</c>.
+        /// </summary>
+        public const string ActivitySourceName = "OrderOrchestration.Orchestrator";
+        private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
+
         private readonly IOrderRepository _orderRepository;
         private readonly IFraudCheckService _fraudCheckService;
         private readonly IOrderStatusNotifier _statusNotifier;
@@ -52,6 +61,9 @@ namespace OrderOrchestration.Application.Orchestration
         /// </summary>
         public async Task Handle(OrderSubmittedEvent notification, CancellationToken cancellationToken)
         {
+            using var activity = ActivitySource.StartActivity("Orchestrator.OrderSubmitted");
+            activity?.SetTag("order.id", notification.OrderId);
+
             var order = await _orderRepository.GetByIdAsync(notification.OrderId);
 
             if (order == null || order.Status != OrderStatus.Pending)
@@ -67,24 +79,67 @@ namespace OrderOrchestration.Application.Orchestration
 
             order.AddDomainEvent(new FraudCheckedEvent(
                 order.OrderId.ToString(),
-                result.IsApproved,
+                result.Decision,
                 result.Reason));
 
             await SaveAndNotifyAsync(order, cancellationToken);
         }
 
         /// <summary>
-        /// Reacciona al resultado de la verificación de fraude. Si es aprobada transiciona a <c>Approved</c>
-        /// y dispara <see cref="OrderApprovedEvent"/>. Si es rechazada, transiciona a <c>Rejected</c>.
+        /// Reacciona al resultado de la verificación de fraude:
+        /// aprobada -> <c>Approved</c>; rechazada -> <c>Rejected</c>;
+        /// revisión manual -> <c>ManualReviewRequired</c> (el flujo se detiene a la espera de un operador).
         /// </summary>
         public async Task Handle(FraudCheckedEvent notification, CancellationToken cancellationToken)
         {
+            using var activity = ActivitySource.StartActivity("Orchestrator.FraudChecked");
+            activity?.SetTag("order.id", notification.OrderId);
+            activity?.SetTag("fraud.decision", notification.Decision.ToString());
+
             var order = await _orderRepository.GetByIdAsync(notification.OrderId);
 
             if (order == null || order.Status != OrderStatus.FraudCheckPending)
                 return;
 
-            if (notification.IsApproved)
+            switch (notification.Decision)
+            {
+                case FraudDecision.Approved:
+                    order.Status = OrderStatus.Approved;
+                    order.AddDomainEvent(new OrderApprovedEvent(order.OrderId.ToString()));
+                    break;
+
+                case FraudDecision.ManualReview:
+                    // Human-in-the-loop: la orden queda en espera de resolución manual; no se emite
+                    // ningún evento de continuación hasta que un operador la apruebe o rechace.
+                    order.Status = OrderStatus.ManualReviewRequired;
+                    break;
+
+                case FraudDecision.Rejected:
+                default:
+                    order.Status = OrderStatus.Rejected;
+                    order.AddDomainEvent(new OrderRejectedEvent(order.OrderId.ToString(), notification.Reason ?? string.Empty));
+                    break;
+            }
+
+            await SaveAndNotifyAsync(order, cancellationToken);
+        }
+
+        /// <summary>
+        /// Reacciona a la resolución manual de una orden en revisión. Si el operador la aprueba,
+        /// transiciona a <c>Approved</c> y continúa el flujo; si la rechaza, transiciona a <c>Rejected</c>.
+        /// </summary>
+        public async Task Handle(ManualReviewResolvedEvent notification, CancellationToken cancellationToken)
+        {
+            using var activity = ActivitySource.StartActivity("Orchestrator.ManualReviewResolved");
+            activity?.SetTag("order.id", notification.OrderId);
+            activity?.SetTag("review.approved", notification.Approved);
+
+            var order = await _orderRepository.GetByIdAsync(notification.OrderId);
+
+            if (order == null || order.Status != OrderStatus.ManualReviewRequired)
+                return;
+
+            if (notification.Approved)
             {
                 order.Status = OrderStatus.Approved;
                 order.AddDomainEvent(new OrderApprovedEvent(order.OrderId.ToString()));
@@ -92,7 +147,7 @@ namespace OrderOrchestration.Application.Orchestration
             else
             {
                 order.Status = OrderStatus.Rejected;
-                order.AddDomainEvent(new OrderRejectedEvent(order.OrderId.ToString(), notification.Reason ?? string.Empty));
+                order.AddDomainEvent(new OrderRejectedEvent(order.OrderId.ToString(), $"Rechazada manualmente por {notification.Reviewer}."));
             }
 
             await SaveAndNotifyAsync(order, cancellationToken);

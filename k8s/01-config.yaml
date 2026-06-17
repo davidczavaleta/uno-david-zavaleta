@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oo-config
+  namespace: order-orchestration
+data:
+  ASPNETCORE_HTTP_PORTS: "8080"
+  MongoDbSettings__ConnectionString: "mongodb://mongo:27017"
+  MongoDbSettings__DatabaseName: "OrderOrchestrationDb"
+  FraudService__Url: "http://fraud:8080"
+  OrderService__Url: "http://core:8080"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oo-secrets
+  namespace: order-orchestration
+type: Opaque
+stringData:
+  # Cadena de conexión de auditoría (incluye credenciales): se mantiene fuera del ConfigMap.
+  ConnectionStrings__AuditPostgres: "Host=postgres;Port=5432;Database=AuditDb;Username=postgres;Password=pgadmin"
+  POSTGRES_PASSWORD: "pgadmin"

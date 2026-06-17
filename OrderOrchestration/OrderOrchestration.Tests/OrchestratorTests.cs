@@ -25,7 +25,7 @@ namespace OrderOrchestration.Tests
             _orderRepository.Setup(r => r.GetByIdAsync(order.OrderId.ToString())).ReturnsAsync(order);
             _fraudCheckService
                 .Setup(f => f.CheckFraudAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new FraudCheckResult(true, "ok"));
+                .ReturnsAsync(new FraudCheckResult(FraudDecision.Approved, "ok"));
             var sut = CreateSut();
 
             // Act
@@ -63,7 +63,7 @@ namespace OrderOrchestration.Tests
             var sut = CreateSut();
 
             // Act
-            await sut.Handle(new FraudCheckedEvent(order.OrderId.ToString(), true, "ok"), CancellationToken.None);
+            await sut.Handle(new FraudCheckedEvent(order.OrderId.ToString(), FraudDecision.Approved, "ok"), CancellationToken.None);
 
             // Assert
             Assert.Equal(OrderStatus.Approved, order.Status);
@@ -80,7 +80,57 @@ namespace OrderOrchestration.Tests
             var sut = CreateSut();
 
             // Act
-            await sut.Handle(new FraudCheckedEvent(order.OrderId.ToString(), false, "fraude detectado"), CancellationToken.None);
+            await sut.Handle(new FraudCheckedEvent(order.OrderId.ToString(), FraudDecision.Rejected, "fraude detectado"), CancellationToken.None);
+
+            // Assert
+            Assert.Equal(OrderStatus.Rejected, order.Status);
+            Assert.Contains(order.OutboxMessages, m => m.Type.Contains(nameof(OrderRejectedEvent)));
+        }
+
+        [Fact]
+        public async Task Handle_FraudCheckedManualReview_MovesToManualReviewRequiredAndStops()
+        {
+            // Arrange
+            var order = TestData.CreateOrder(OrderStatus.FraudCheckPending);
+            _orderRepository.Setup(r => r.GetByIdAsync(order.OrderId.ToString())).ReturnsAsync(order);
+            var sut = CreateSut();
+
+            // Act
+            await sut.Handle(new FraudCheckedEvent(order.OrderId.ToString(), FraudDecision.ManualReview, "revision"), CancellationToken.None);
+
+            // Assert
+            Assert.Equal(OrderStatus.ManualReviewRequired, order.Status);
+            Assert.DoesNotContain(order.OutboxMessages, m => m.Type.Contains(nameof(OrderApprovedEvent)));
+            Assert.DoesNotContain(order.OutboxMessages, m => m.Type.Contains(nameof(OrderRejectedEvent)));
+            _orderRepository.Verify(r => r.SaveAsync(order), Times.Once);
+        }
+
+        [Fact]
+        public async Task Handle_ManualReviewResolvedApproved_MovesToApprovedAndEmitsOrderApprovedEvent()
+        {
+            // Arrange
+            var order = TestData.CreateOrder(OrderStatus.ManualReviewRequired);
+            _orderRepository.Setup(r => r.GetByIdAsync(order.OrderId.ToString())).ReturnsAsync(order);
+            var sut = CreateSut();
+
+            // Act
+            await sut.Handle(new ManualReviewResolvedEvent(order.OrderId.ToString(), true, "operador-1"), CancellationToken.None);
+
+            // Assert
+            Assert.Equal(OrderStatus.Approved, order.Status);
+            Assert.Contains(order.OutboxMessages, m => m.Type.Contains(nameof(OrderApprovedEvent)));
+        }
+
+        [Fact]
+        public async Task Handle_ManualReviewResolvedRejected_MovesToRejectedAndEmitsOrderRejectedEvent()
+        {
+            // Arrange
+            var order = TestData.CreateOrder(OrderStatus.ManualReviewRequired);
+            _orderRepository.Setup(r => r.GetByIdAsync(order.OrderId.ToString())).ReturnsAsync(order);
+            var sut = CreateSut();
+
+            // Act
+            await sut.Handle(new ManualReviewResolvedEvent(order.OrderId.ToString(), false, "operador-1"), CancellationToken.None);
 
             // Assert
             Assert.Equal(OrderStatus.Rejected, order.Status);
@@ -127,7 +177,7 @@ namespace OrderOrchestration.Tests
             var sut = CreateSut();
 
             // Act
-            await sut.Handle(new FraudCheckedEvent(Guid.NewGuid().ToString(), true, "ok"), CancellationToken.None);
+            await sut.Handle(new FraudCheckedEvent(Guid.NewGuid().ToString(), FraudDecision.Approved, "ok"), CancellationToken.None);
 
             // Assert
             _orderRepository.Verify(r => r.SaveAsync(It.IsAny<Order>()), Times.Never);

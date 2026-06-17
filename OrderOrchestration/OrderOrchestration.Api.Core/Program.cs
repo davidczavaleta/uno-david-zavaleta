@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OrderOrchestration.Api.Core.Services;
 using OrderOrchestration.Application.Commands;
+using OrderOrchestration.Application.Orchestration;
 using OrderOrchestration.Infrastructure;
+using OrderOrchestration.Infrastructure.Outbox;
 using OrderOrchestration.Infrastructure.Postgres;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +14,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 builder.Services.AddGrpcHealthChecks();
 builder.Services.AddGrpcReflection();
+
+// Observabilidad: trazas distribuidas exportadas por OTLP (Jaeger). El endpoint se toma de
+// la variable OTEL_EXPORTER_OTLP_ENDPOINT (por defecto http://localhost:4317).
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("OrderOrchestration.Api.Core"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddSource(Orchestrator.ActivitySourceName)
+        .AddSource(OutboxDispatcher.ActivitySourceName)
+        .AddOtlpExporter());
 
 // MediatR: registra comandos, handlers y el orquestador (notification handlers) del ensamblado de Application.
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(SubmitOrderCommand).Assembly));

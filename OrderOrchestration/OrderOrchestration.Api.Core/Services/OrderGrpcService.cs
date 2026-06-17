@@ -100,6 +100,56 @@ namespace OrderOrchestration.Api.Core.Services
             }
         }
 
+        /// <summary>
+        /// Resuelve manualmente una orden en revisión (human-in-the-loop) aprobándola o rechazándola.
+        /// </summary>
+        public override async Task<ResolveManualReviewReply> ResolveManualReview(ResolveManualReviewRequest request, ServerCallContext context)
+        {
+            if (!Guid.TryParse(request.OrderId, out var orderId))
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "OrderId inválido."));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Reviewer))
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Reviewer es requerido."));
+            }
+
+            var order = await _mediator.Send(
+                new ResolveManualReviewCommand(orderId, request.Approved, request.Reviewer),
+                context.CancellationToken);
+
+            if (order is null)
+            {
+                throw new RpcException(new Status(StatusCode.FailedPrecondition, "La orden no existe o no está en revisión manual."));
+            }
+
+            return new ResolveManualReviewReply
+            {
+                OrderId = order.OrderId.ToString(),
+                Status = order.Status.ToString()
+            };
+        }
+
+        /// <summary>
+        /// Lista las órdenes que están pendientes de revisión manual.
+        /// </summary>
+        public override async Task<GetPendingReviewsReply> GetPendingReviews(GetPendingReviewsRequest request, ServerCallContext context)
+        {
+            var pending = await _orderRepository.GetByStatusAsync(OrderStatus.ManualReviewRequired);
+
+            var reply = new GetPendingReviewsReply();
+            reply.Reviews.AddRange(pending.Select(o => new PendingReview
+            {
+                OrderId = o.OrderId.ToString(),
+                UserId = o.UserId,
+                TotalAmount = (double)o.TotalAmount,
+                CreatedAt = o.CreatedAt.ToString("O")
+            }));
+
+            return reply;
+        }
+
         private static OrderItemDto MapItem(OrderItemMessage item)
         {
             var productId = Guid.TryParse(item.ProductId, out var id) ? id : Guid.Empty;

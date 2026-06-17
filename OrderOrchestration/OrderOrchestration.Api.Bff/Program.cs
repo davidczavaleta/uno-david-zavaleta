@@ -1,3 +1,5 @@
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OrderOrchestration.Api.Bff.Hubs;
 using OrderOrchestration.Api.Bff.Services;
 using OrderOrchestration.Api.Core;
@@ -9,6 +11,14 @@ const string CorsPolicy = "AngularClient";
 // REST + documentación OpenAPI
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+// Observabilidad: trazas distribuidas exportadas por OTLP (Jaeger).
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("OrderOrchestration.Api.Bff"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter());
 
 // SignalR para el seguimiento de órdenes en tiempo real
 builder.Services.AddSignalR();

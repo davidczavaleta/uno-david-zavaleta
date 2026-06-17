@@ -68,6 +68,12 @@ namespace OrderOrchestration.Infrastructure.Mongo
         }
 
         /// <inheritdoc />
+        public async Task<List<Order>> GetByStatusAsync(OrderStatus status)
+        {
+            return await _ordersCollection.Find(o => o.Status == status).ToListAsync();
+        }
+
+        /// <inheritdoc />
         public async Task MarkOutboxMessageProcessedAsync(Guid orderId, Guid messageId)
         {
             var filter = Builders<Order>.Filter.And(

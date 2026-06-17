@@ -37,5 +37,11 @@ namespace OrderOrchestration.Domain.Data
         /// <param name="orderId">Id de la orden propietaria del mensaje.</param>
         /// <param name="messageId">Id del mensaje del outbox a marcar como procesado.</param>
         Task MarkOutboxMessageProcessedAsync(Guid orderId, Guid messageId);
+
+        /// <summary>
+        /// Obtiene todas las órdenes que se encuentran en el estado indicado.
+        /// Usado, por ejemplo, para listar las órdenes pendientes de revisión manual.
+        /// </summary>
+        Task<List<Order>> GetByStatusAsync(OrderStatus status);
     }
 }

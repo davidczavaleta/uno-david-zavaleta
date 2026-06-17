@@ -1,3 +1,5 @@
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OrderOrchestration.Api.Fraud.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,6 +8,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 builder.Services.AddGrpcHealthChecks();
 builder.Services.AddGrpcReflection();
+
+// Observabilidad: trazas distribuidas exportadas por OTLP (Jaeger).
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("OrderOrchestration.Api.Fraud"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter());
 
 var app = builder.Build();
 

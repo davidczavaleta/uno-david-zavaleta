@@ -14,6 +14,7 @@ namespace OrderOrchestration.Application.Auditing
     public class AuditEventHandler :
         INotificationHandler<OrderSubmittedEvent>,
         INotificationHandler<FraudCheckedEvent>,
+        INotificationHandler<ManualReviewResolvedEvent>,
         INotificationHandler<OrderApprovedEvent>,
         INotificationHandler<OrderRejectedEvent>,
         INotificationHandler<PaymentProcessedEvent>,
@@ -32,7 +33,11 @@ namespace OrderOrchestration.Application.Auditing
 
         public Task Handle(FraudCheckedEvent notification, CancellationToken cancellationToken) =>
             WriteAsync(notification.OrderId, "FraudChecked",
-                $"Aprobada={notification.IsApproved}; Motivo={notification.Reason}");
+                $"Decision={notification.Decision}; Motivo={notification.Reason}");
+
+        public Task Handle(ManualReviewResolvedEvent notification, CancellationToken cancellationToken) =>
+            WriteAsync(notification.OrderId, "ManualReviewResolved",
+                $"Aprobada={notification.Approved}; Operador={notification.Reviewer}");
 
         public Task Handle(OrderApprovedEvent notification, CancellationToken cancellationToken) =>
             WriteAsync(notification.OrderId, "OrderApproved", "Orden aprobada tras la verificación de fraude.");

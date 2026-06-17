@@ -14,7 +14,16 @@ message FraudCheckRequest {
   double total_amount = 3;
 }
 
+enum FraudDecision {
+  FRAUD_DECISION_UNSPECIFIED = 0;
+  APPROVED = 1;
+  REJECTED = 2;
+  MANUAL_REVIEW = 3;
+}
+
 message FraudCheckResponse {
+  // Conservado por compatibilidad; usar 'decision' como fuente de verdad.
   bool is_approved = 1;
   string reason = 2;
+  FraudDecision decision = 3;
 }

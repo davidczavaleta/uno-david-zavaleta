@@ -1,0 +1,98 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: oo-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    container_name: oo-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pgadmin
+      POSTGRES_DB: AuditDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: oo-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI de Jaeger
+      - "4317:4317"     # OTLP gRPC
+
+  fraud:
+    build:
+      context: ./OrderOrchestration
+      dockerfile: OrderOrchestration.Api.Fraud/Dockerfile
+    container_name: oo-fraud
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+    depends_on:
+      - jaeger
+
+  core:
+    build:
+      context: ./OrderOrchestration
+      dockerfile: OrderOrchestration.Api.Core/Dockerfile
+    container_name: oo-core
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      MongoDbSettings__ConnectionString: "mongodb://mongo:27017"
+      MongoDbSettings__DatabaseName: "OrderOrchestrationDb"
+      ConnectionStrings__AuditPostgres: "Host=postgres;Port=5432;Database=AuditDb;Username=postgres;Password=pgadmin"
+      FraudService__Url: "http://fraud:8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      fraud:
+        condition: service_started
+      jaeger:
+        condition: service_started
+
+  bff:
+    build:
+      context: ./OrderOrchestration
+      dockerfile: OrderOrchestration.Api.Bff/Dockerfile
+    container_name: oo-bff
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      OrderService__Url: "http://core:8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+    depends_on:
+      - core
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: oo-frontend
+    ports:
+      - "8088:80"
+    depends_on:
+      - bff
+
+volumes:
+  mongo-data:
+  postgres-data:

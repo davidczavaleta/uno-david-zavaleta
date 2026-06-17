@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespace.yaml
+  - 01-config.yaml
+  - 02-mongo.yaml
+  - 03-postgres.yaml
+  - 04-jaeger.yaml
+  - 05-fraud.yaml
+  - 06-core.yaml
+  - 07-bff.yaml
+  - 08-frontend.yaml
