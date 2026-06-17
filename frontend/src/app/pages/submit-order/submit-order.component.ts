@@ -1,5 +1,4 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -7,6 +6,7 @@ import {
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { OrderStatusUpdate } from '../../models/order.models';
 import { OrderService } from '../../services/order.service';
@@ -15,7 +15,7 @@ import { OrderStatusHubService } from '../../services/order-status-hub.service';
 @Component({
   selector: 'app-submit-order',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule, DecimalPipe],
   template: `
     <div class="card">
       <h1>Enviar nueva orden</h1>
@@ -28,21 +28,23 @@ import { OrderStatusHubService } from '../../services/order-status-hub.service';
 
         <h2 style="margin-top:20px;">Items</h2>
         <div formArrayName="items">
-          <div *ngFor="let item of items.controls; let i = index" [formGroupName]="i" class="row" style="align-items:flex-end;">
-            <div>
-              <label>Producto (GUID)</label>
-              <input formControlName="productId" />
+          @for (item of items.controls; track item; let i = $index) {
+            <div [formGroupName]="i" class="row" style="align-items:flex-end;">
+              <div>
+                <label>Producto (GUID)</label>
+                <input formControlName="productId" readonly />
+              </div>
+              <div>
+                <label>Cantidad</label>
+                <input type="number" formControlName="quantity" min="1" />
+              </div>
+              <div>
+                <label>Precio unitario</label>
+                <input type="number" formControlName="unitPrice" min="0.01" step="0.01" />
+              </div>
+              <button type="button" class="secondary" (click)="removeItem(i)" [disabled]="items.length === 1">Quitar</button>
             </div>
-            <div>
-              <label>Cantidad</label>
-              <input type="number" formControlName="quantity" min="1" />
-            </div>
-            <div>
-              <label>Precio unitario</label>
-              <input type="number" formControlName="unitPrice" min="0.01" step="0.01" />
-            </div>
-            <button type="button" class="secondary" (click)="removeItem(i)" [disabled]="items.length === 1">Quitar</button>
-          </div>
+          }
         </div>
         <button type="button" class="secondary" style="margin-top:12px;" (click)="addItem()">+ Agregar item</button>
 
@@ -53,22 +55,30 @@ import { OrderStatusHubService } from '../../services/order-status-hub.service';
             {{ submitting ? 'Enviando...' : 'Enviar orden' }}
           </button>
         </div>
-        <p class="error" *ngIf="error">{{ error }}</p>
+        @if (error) {
+          <p class="error">{{ error }}</p>
+        }
       </form>
     </div>
 
-    <div class="card" *ngIf="trackedOrderId">
-      <h2>Seguimiento en vivo — {{ trackedOrderId }}</h2>
-      <ul class="timeline">
-        <li *ngFor="let u of updates">
-          <span class="badge" [class.ok]="isOk(u.status)" [class.warn]="isWarn(u.status)" [class.err]="isErr(u.status)">
-            {{ u.status }}
-          </span>
-          <span class="muted">{{ u.timestamp }}</span>
-        </li>
-      </ul>
-      <p class="muted" *ngIf="updates.length === 0">Esperando actualizaciones...</p>
-    </div>
+    @if (trackedOrderId) {
+      <div class="card">
+        <h2>Seguimiento en vivo — {{ trackedOrderId }}</h2>
+        <ul class="timeline">
+          @for (u of updates; track u.timestamp) {
+            <li>
+              <span class="badge" [class.ok]="isOk(u.status)" [class.warn]="isWarn(u.status)" [class.err]="isErr(u.status)">
+                {{ u.status }}
+              </span>
+              <span class="muted">{{ u.timestamp }}</span>
+            </li>
+          }
+        </ul>
+        @if (updates.length === 0) {
+          <p class="muted">Esperando actualizaciones...</p>
+        }
+      </div>
+    }
   `
 })
 export class SubmitOrderComponent implements OnInit, OnDestroy {
@@ -83,7 +93,8 @@ export class SubmitOrderComponent implements OnInit, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
     private readonly orderService: OrderService,
-    private readonly hub: OrderStatusHubService
+    private readonly hub: OrderStatusHubService,
+    private readonly cdr: ChangeDetectorRef
   ) {
     this.form = this.fb.group({
       userId: ['user-1', Validators.required],
@@ -96,6 +107,7 @@ export class SubmitOrderComponent implements OnInit, OnDestroy {
     this.sub = this.hub.status$.subscribe((update) => {
       if (update.orderId === this.trackedOrderId) {
         this.updates = [...this.updates, update];
+        this.cdr.detectChanges();
       }
     });
   }
@@ -118,7 +130,7 @@ export class SubmitOrderComponent implements OnInit, OnDestroy {
 
   createItem(): FormGroup {
     return this.fb.group({
-      productId: ['11111111-1111-1111-1111-111111111111', Validators.required],
+      productId: [crypto.randomUUID(), Validators.required],
       quantity: [1, [Validators.required, Validators.min(1)]],
       unitPrice: [100, [Validators.required, Validators.min(0.01)]]
     });
@@ -155,10 +167,12 @@ export class SubmitOrderComponent implements OnInit, OnDestroy {
         this.updates = [];
         await this.hub.subscribe(response.orderId);
         this.submitting = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.error = err?.error?.error ?? 'No se pudo enviar la orden.';
         this.submitting = false;
+        this.cdr.detectChanges();
       }
     });
   }

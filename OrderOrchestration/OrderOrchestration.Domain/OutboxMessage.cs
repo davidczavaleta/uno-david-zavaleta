@@ -1,4 +1,4 @@
-﻿namespace OrderOrchestration.Domain
+namespace OrderOrchestration.Domain
 {
     /// <summary>
     /// El mensaje de la bandeja de salida (outbox) que representa un evento de dominio

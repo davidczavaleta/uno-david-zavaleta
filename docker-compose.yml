@@ -20,7 +20,7 @@ services:
       POSTGRES_PASSWORD: pgadmin
       POSTGRES_DB: AuditDb
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -89,7 +89,7 @@ services:
       dockerfile: Dockerfile
     container_name: oo-frontend
     ports:
-      - "8088:80"
+      - "4200:80"
     depends_on:
       - bff
 

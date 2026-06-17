@@ -56,9 +56,9 @@ namespace OrderOrchestration.Api.Bff.Controllers
             {
                 var reply = await _orderClient.SubmitOrderAsync(grpcRequest, cancellationToken: cancellationToken);
 
-                // Inicia el reenvío del stream de estado para que los clientes SignalR reciban las actualizaciones.
-                _statusRelay.EnsureRelay(reply.OrderId);
-
+                // El reenvío se iniciará únicamente cuando el cliente Angular llame a Subscribe en el Hub,
+                // para evitar una condición de carrera (SignalR emite el snapshot antes de que el cliente se haya unido al grupo).
+                
                 return Ok(new SubmitOrderResponseDto(reply.OrderId, reply.Status));
             }
             catch (RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.InvalidArgument)

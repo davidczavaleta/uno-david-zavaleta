@@ -1,13 +1,13 @@
-import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 import { PendingReview } from '../../models/order.models';
 import { OrderService } from '../../services/order.service';
 
 @Component({
   selector: 'app-admin-reviews',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule, DecimalPipe],
   template: `
     <div class="card">
       <h1>Revisión manual de órdenes</h1>
@@ -20,37 +20,42 @@ import { OrderService } from '../../services/order.service';
           {{ loading ? 'Cargando...' : 'Refrescar' }}
         </button>
       </div>
-      <p class="error" *ngIf="error">{{ error }}</p>
+      @if (error) {
+        <p class="error">{{ error }}</p>
+      }
     </div>
 
     <div class="card">
       <h2>Pendientes ({{ reviews.length }})</h2>
-      <table *ngIf="reviews.length > 0; else empty">
-        <thead>
-          <tr>
-            <th>Orden</th>
-            <th>Usuario</th>
-            <th>Monto</th>
-            <th>Creada</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let r of reviews">
-            <td>{{ r.orderId }}</td>
-            <td>{{ r.userId }}</td>
-            <td>{{ r.totalAmount | number: '1.2-2' }}</td>
-            <td class="muted">{{ r.createdAt }}</td>
-            <td>
-              <button class="ok" (click)="resolve(r.orderId, true)" [disabled]="!reviewer || busyId === r.orderId">Aprobar</button>
-              <button class="danger" (click)="resolve(r.orderId, false)" [disabled]="!reviewer || busyId === r.orderId">Rechazar</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <ng-template #empty>
+      @if (reviews.length > 0) {
+        <table>
+          <thead>
+            <tr>
+              <th>Orden</th>
+              <th>Usuario</th>
+              <th>Monto</th>
+              <th>Creada</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of reviews; track r.orderId) {
+              <tr>
+                <td>{{ r.orderId }}</td>
+                <td>{{ r.userId }}</td>
+                <td>{{ r.totalAmount | number: '1.2-2' }}</td>
+                <td class="muted">{{ r.createdAt }}</td>
+                <td>
+                  <button class="ok" (click)="resolve(r.orderId, true)" [disabled]="!reviewer || busyId === r.orderId">Aprobar</button>
+                  <button class="danger" (click)="resolve(r.orderId, false)" [disabled]="!reviewer || busyId === r.orderId">Rechazar</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
         <p class="muted">No hay órdenes pendientes de revisión.</p>
-      </ng-template>
+      }
     </div>
   `
 })

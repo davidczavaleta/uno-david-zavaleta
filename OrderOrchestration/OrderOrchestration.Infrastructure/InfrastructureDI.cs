@@ -1,7 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
+using OrderOrchestration.Domain;
 using OrderOrchestration.Application.Contracts;
 using OrderOrchestration.Domain.Data;
 using OrderOrchestration.Infrastructure.GrpcClients;
@@ -31,7 +35,38 @@ namespace OrderOrchestration.Infrastructure
             //1. Mongo settings
             services.Configure<MongoDbSettings>(configuration.GetSection("MongoDbSettings"));
 
-            //2. Mongo client 
+            //2. Mongo client
+            // El driver MongoDB 3.x cambia GuidRepresentation a Unspecified por defecto.
+            // Hay que registrar el serializador globalmente para TODOS los GUIDs (ej. OrderItem.ProductId).
+            BsonSerializer.TryRegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+
+            // Configurar BsonClassMap para Order y OutboxMessage:
+            // - MapId: usa OrderId como _id en Mongo (evita ObjectId auto-generado duplicado)
+            // - SetIgnoreExtraElements: tolera campos no mapeados (compatibilidad driver 3.x)
+            // - GuidSerializer(Standard): serializa Guids como UUID RFC 4122
+            // Se registra aquí (Infrastructure) para no contaminar el Domain con refs a MongoDB.
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Order)))
+            {
+                BsonClassMap.RegisterClassMap<Order>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.SetIgnoreExtraElements(true);
+                    cm.MapIdMember(c => c.OrderId)
+                      .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                });
+            }
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(OutboxMessage)))
+            {
+                BsonClassMap.RegisterClassMap<OutboxMessage>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.SetIgnoreExtraElements(true);
+                    cm.MapMember(c => c.Id)
+                      .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                });
+            }
+
             services.AddSingleton<IMongoClient>(sp =>
             {
                 var settings = configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();

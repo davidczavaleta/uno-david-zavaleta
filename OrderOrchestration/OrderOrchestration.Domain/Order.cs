@@ -1,4 +1,4 @@
-﻿using OrderOrchestration.Domain.Events;
+using OrderOrchestration.Domain.Events;
 using System.Text.Json;
 
 namespace OrderOrchestration.Domain

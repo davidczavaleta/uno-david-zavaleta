@@ -1,4 +1,4 @@
-﻿using OrderOrchestration.Domain;
+using OrderOrchestration.Domain;
 using OrderOrchestration.Domain.Data;
 
 namespace OrderOrchestration.Infrastructure.Postgres
