@@ -1,5 +1,4 @@
-import { Component, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { PendingReview } from '../../models/order.models';
 import { OrderService } from '../../services/order.service';
@@ -7,15 +6,11 @@ import { OrderService } from '../../services/order.service';
 @Component({
   selector: 'app-admin-reviews',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [DecimalPipe],
   template: `
     <div class="card">
       <h1>Revisión manual de órdenes</h1>
       <div class="row" style="align-items:flex-end;">
-        <div style="max-width:280px;">
-          <label>Operador (reviewer)</label>
-          <input [(ngModel)]="reviewer" placeholder="operador-1" />
-        </div>
         <button class="secondary" (click)="load()" [disabled]="loading">
           {{ loading ? 'Cargando...' : 'Refrescar' }}
         </button>
@@ -46,8 +41,8 @@ import { OrderService } from '../../services/order.service';
                 <td>{{ r.totalAmount | number: '1.2-2' }}</td>
                 <td class="muted">{{ r.createdAt }}</td>
                 <td>
-                  <button class="ok" (click)="resolve(r.orderId, true)" [disabled]="!reviewer || busyId === r.orderId">Aprobar</button>
-                  <button class="danger" (click)="resolve(r.orderId, false)" [disabled]="!reviewer || busyId === r.orderId">Rechazar</button>
+                  <button class="ok" (click)="resolve(r.orderId, true)" [disabled]="busyId === r.orderId">Aprobar</button>
+                  <button class="danger" (click)="resolve(r.orderId, false)" [disabled]="busyId === r.orderId">Rechazar</button>
                 </td>
               </tr>
             }
@@ -61,12 +56,11 @@ import { OrderService } from '../../services/order.service';
 })
 export class AdminReviewsComponent implements OnInit {
   reviews: PendingReview[] = [];
-  reviewer = 'operador-1';
   loading = false;
   busyId = '';
   error = '';
 
-  constructor(private readonly orderService: OrderService) {}
+  constructor(private readonly orderService: OrderService, private readonly cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.load();
@@ -79,24 +73,28 @@ export class AdminReviewsComponent implements OnInit {
       next: (data) => {
         this.reviews = data;
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.error = 'No se pudo cargar la lista de pendientes.';
         this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }
 
   resolve(orderId: string, approved: boolean): void {
     this.busyId = orderId;
-    this.orderService.resolveReview(orderId, approved, this.reviewer).subscribe({
+    this.orderService.resolveReview(orderId, approved, 'Admin').subscribe({
       next: () => {
         this.reviews = this.reviews.filter((r) => r.orderId !== orderId);
         this.busyId = '';
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.error = err?.error?.error ?? 'No se pudo resolver la orden.';
         this.busyId = '';
+        this.cdr.detectChanges();
       }
     });
   }
